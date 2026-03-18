@@ -1,0 +1,11 @@
+[project]
+name = "wayland-peek"
+version = "0.1.0"
+description = " A \"window spy\" alternative for windows (or kdotool GUI implementation) "
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "colorama>=0.4.6",
+    "pynput>=1.8.1",
+    "pyside6>=6.10.2",
+]
