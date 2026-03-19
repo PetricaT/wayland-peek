@@ -4,8 +4,9 @@ import sys
 import threading
 import time
 
-import pynput.keyboard as keyboard
+import evdev
 from colorama import Fore, Style
+from evdev import InputDevice, ecodes
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtUiTools import QUiLoader
 
@@ -24,7 +25,7 @@ class keyboardManager:
         else:
             self._run_event.set()
 
-    def handle_ctrl_switch(self, value):
+    def handle_ctrl_switch(self, value: bool):
         self._ctrl_pressed = value
         self._update()
 
@@ -33,27 +34,129 @@ class keyboardManager:
         self._update()
 
     def wait_if_paused(self):
-        # Block the calling thread until polling is allowed.
         self._run_event.wait()
 
 
-def parse_cursor_location() -> str:
-    result = (
-        subprocess.run(["kdotool", "getmouselocation"], stdout=subprocess.PIPE)
-        .stdout.strip()
-        .decode("utf-8")
-    )
-    result = result.split(":")
-    try:
-        _x = result[1].split(" ")[0]
-        _y = result[2].split(" ")[0]
-        _screen = result[3].split(" ")[0]
-        _window_uuid = result[4].replace("{", "").replace("}", "")
+def _find_keyboards() -> list[InputDevice]:
+    """
+    Return all /dev/input devices that look like real keyboards.
+    Requires a broad spread of letter, number, and modifier keys so that
+    tablets, gamepads, and other HID devices that only expose a few KEY_*
+    codes are excluded.
+    """
+    # Every key in this set must be present for the device to qualify.
+    REQUIRED_KEYS = {
+        ecodes.KEY_ESC,
+        ecodes.KEY_LEFTCTRL,
+        ecodes.KEY_LEFTSHIFT,
+        ecodes.KEY_A,
+        ecodes.KEY_Z,  # letters
+        ecodes.KEY_ENTER,
+        ecodes.KEY_SPACE,  # basics
+    }
+    keyboards = []
+    for path in evdev.list_devices():
+        try:
+            dev = InputDevice(path)
+            caps = dev.capabilities(verbose=True)
+            if ecodes.EV_KEY in caps:
+                key_codes = set(caps[ecodes.EV_KEY])
+                if REQUIRED_KEYS.issubset(key_codes):
+                    print(f"[keyboard] Found device: {dev.name!r} ({dev.path})")
+                    print(caps)
+                    keyboards.append(dev)
+                else:
+                    # missing = REQUIRED_KEYS - key_codes
+                    missing = REQUIRED_KEYS
+                    print(
+                        f"[keyboard] Skipping {dev.name!r} ({dev.path}) — not a keyboard, missing: {[ecodes.KEY[k] for k in missing]}"
+                    )
+        except (PermissionError, OSError) as e:
+            print(f"[keyboard] Skipping {path}: {e}")
+    return keyboards
 
-        result = f"X: {_x}, Y: {_y}\nScreen: {_screen}\nUUID: {_window_uuid}"
-    except IndexError:
-        result = ""
-    return result
+
+def _listen_keyboard(dev: InputDevice, handler: keyboardManager):
+    """
+    Read key events from a single InputDevice in a tight loop.
+    Runs in its own daemon thread (one per keyboard device found).
+
+    evdev key event values:
+        0 = key up
+        1 = key down
+        2 = key hold (auto-repeat)
+    """
+    print(f"[keyboard] Listening on {dev.name!r} ({dev.path})")
+    try:
+        for event in dev.read_loop():
+            if event.type != ecodes.EV_KEY:
+                continue
+
+            code = event.code
+            value = event.value  # 0=up, 1=down, 2=hold
+
+            # ESC hard exit
+            if code == ecodes.KEY_ESC and value == 1:
+                print("[keyboard] ESC pressed → exiting")
+                os._exit(0)
+
+            # CTRL hold-to-freeze
+            if code in (ecodes.KEY_LEFTCTRL, ecodes.KEY_RIGHTCTRL):
+                if value == 1:
+                    print(f"[keyboard] CTRL down (code={code}, device={dev.path})")
+                    handler.handle_ctrl_switch(True)
+                elif value == 0:
+                    print(f"[keyboard] CTRL up   (code={code}, device={dev.path})")
+                    handler.handle_ctrl_switch(False)
+
+            # Left Shift toggle freeze
+            if code == ecodes.KEY_LEFTSHIFT and value == 1:
+                print(f"[keyboard] SHIFT toggle (device={dev.path})")
+                handler.handle_shift_switch()
+
+    except (OSError, IOError) as e:
+        print(f"[keyboard] Device {dev.path} lost: {e}")
+        pass
+
+
+def start_keyboard_listeners(handler: keyboardManager):
+    """
+    Discover all keyboard devices and spawn one daemon listener thread each.
+    Also spawns a watchdog that re-scans every 5 s to pick up hot-plugged
+    keyboards.
+    """
+    active_paths: set[str] = set()
+
+    def _spawn(dev: InputDevice):
+        active_paths.add(dev.path)
+        t = threading.Thread(target=_listen_keyboard, args=(dev, handler), daemon=True)
+        t.start()
+
+    # Initial scan
+    for dev in _find_keyboards():
+        _spawn(dev)
+
+    if not active_paths:
+        print(
+            Fore.YELLOW
+            + Style.BRIGHT
+            + "Warning:"
+            + Style.RESET_ALL
+            + " No keyboard devices found in /dev/input. "
+            "Make sure your user is in the 'input' group:\n"
+            "  sudo usermod -aG input $USER  (then re-login)"
+        )
+
+    # Watchdog for hot-plug
+    def _watchdog():
+        while True:
+            time.sleep(5)
+            for dev in _find_keyboards():
+                if dev.path not in active_paths:
+                    print(f"[keyboard] New keyboard detected: {dev.name} ({dev.path})")
+                    _spawn(dev)
+
+    threading.Thread(target=_watchdog, daemon=True).start()
 
 
 class MainApp:
@@ -108,7 +211,6 @@ class MainApp:
             .stdout.strip()
             .decode("utf-8")
         )
-
         try:
             if type == "cursor_info":
                 result = result.split("\n")
@@ -128,9 +230,9 @@ class MainApp:
                 self._window_title = result[1]
                 self._executable_name = result[2]
                 self._window_position = result[4].split(":")[1].split(",")
-                _winpos_x = float(self._window_position[0]).__trunc__()
-                _winpos_y = float(self._window_position[1]).__trunc__()
-                self._window_position = f"{_winpos_x}, {_winpos_y}"
+                self._window_position = (
+                    f"{int(self._window_position[0])}, {int(self._window_position[1])}"
+                )
                 self._window_geometry = result[5].split(":")[1].split("x")
                 self._window_geometry = (
                     f"{int(self._window_geometry[0])}x{int(self._window_geometry[1])}"
@@ -150,35 +252,7 @@ class LabelUpdater(QtCore.QObject):
 def main():
     global keyboardHandler
     keyboardHandler = keyboardManager()
-
-    # Panic button
-    keyboard.Listener(
-        on_press=lambda key: sys.exit(0) if key == keyboard.Key.esc else None
-    ).start()
-
-    # CTRL hold to freeze
-    keyboard.Listener(
-        on_press=lambda key: (
-            keyboardHandler.handle_ctrl_switch(True)
-            if key == keyboard.Key.ctrl
-            else None
-        ),
-        on_release=lambda key: (
-            keyboardHandler.handle_ctrl_switch(False)
-            if key == keyboard.Key.ctrl
-            else None
-        ),
-    ).start()
-
-    # Shift toggle freeze
-    keyboard.Listener(
-        on_press=lambda key: (
-            keyboardHandler.handle_shift_switch()
-            if key == keyboard.Key.shift_l
-            else None
-        )
-    ).start()
-
+    start_keyboard_listeners(keyboardHandler)
     MainApp()
 
 
@@ -204,4 +278,6 @@ if __name__ == "__main__":
             + " is not installed, please install it first"
         )
         sys.exit(0)
+
+    print(f"PID: {os.getpid()}")
     main()
