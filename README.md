@@ -12,9 +12,44 @@ If you've used automation scripts on windows with [AutoHotKey](https://www.autoh
 
 Also I higly reccomend [ydotool](https://github.com/ReimuNotMoe/ydotool) for any input automation. 
 
-## Backend rework in progress
+# How to run
+Clone the repo somewhere and cd into it
 
-Currently, I am not able to compile the script to an executable or appimage because of **pynput**. I am working on a rework to use **evdev** instead, but I can't figure out how it fully works out yet.
+<div style="position: relative;">
+  <button 
+    style="position: absolute; top: 5px; right: 5px; z-index: 1;"
+    onclick="navigator.clipboard.writeText(document.getElementById('clone-repo').textContent).then(() => this.textContent = 'Copied!').then(() => setTimeout(() => this.textContent = 'Copy', 2000))"
+  >
+  </button>
+  <pre><code id="clone-repo">git clone https://github.com/PetricaT/wayland-peek.git && cd wayland-peek</code></pre>
+</div>
+
+install the required libraries
+
+<div style="position: relative;">
+  <button 
+    style="position: absolute; top: 5px; right: 5px; z-index: 1;"
+    onclick="navigator.clipboard.writeText(document.getElementById('install-deps').textContent).then(() => this.textContent = 'Copied!').then(() => setTimeout(() => this.textContent = 'Copy', 2000))"
+  >
+  </button>
+<pre><code id="install-deps">pip install -r requirements.txt</code></pre>
+</div>
+
+and run the main script file
+
+<div style="position: relative;">
+  <button 
+    style="position: absolute; top: 5px; right: 5px; z-index: 1;"
+    onclick="navigator.clipboard.writeText(document.getElementById('run-script').textContent).then(() => this.textContent = 'Copied!').then(() => setTimeout(() => this.textContent = 'Copy', 2000))"
+  >
+  </button>
+<pre><code id="run-script">python main.py</code></pre>
+</div>
+
+> [!NOTE]
+> ### Backend rework in progress
+> 
+> Currently, I am not able to compile the script to an executable or appimage because of **pynput**. I am working on a rework to use **evdev** instead, but I can't figure out how it fully works out yet.
 
 ## Peformance
 
