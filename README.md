@@ -15,36 +15,21 @@ Also I higly reccomend [ydotool](https://github.com/ReimuNotMoe/ydotool) for any
 # How to run
 Clone the repo somewhere and cd into it
 
-<div style="position: relative;">
-  <button 
-    style="position: absolute; top: 5px; right: 5px; z-index: 1;"
-    onclick="navigator.clipboard.writeText(document.getElementById('clone-repo').textContent).then(() => this.textContent = 'Copied!').then(() => setTimeout(() => this.textContent = 'Copy', 2000))"
-  >
-  </button>
-  <pre><code id="clone-repo">git clone https://github.com/PetricaT/wayland-peek.git && cd wayland-peek</code></pre>
-</div>
+```
+git clone https://github.com/PetricaT/wayland-peek.git && cd wayland-peek
+```
 
 install the required libraries
 
-<div style="position: relative;">
-  <button 
-    style="position: absolute; top: 5px; right: 5px; z-index: 1;"
-    onclick="navigator.clipboard.writeText(document.getElementById('install-deps').textContent).then(() => this.textContent = 'Copied!').then(() => setTimeout(() => this.textContent = 'Copy', 2000))"
-  >
-  </button>
-<pre><code id="install-deps">pip install -r requirements.txt</code></pre>
-</div>
+```
+pip install -r requirements.txt
+```
 
 and run the main script file
 
-<div style="position: relative;">
-  <button 
-    style="position: absolute; top: 5px; right: 5px; z-index: 1;"
-    onclick="navigator.clipboard.writeText(document.getElementById('run-script').textContent).then(() => this.textContent = 'Copied!').then(() => setTimeout(() => this.textContent = 'Copy', 2000))"
-  >
-  </button>
-<pre><code id="run-script">python main.py</code></pre>
-</div>
+```
+python main.py<
+```
 
 > [!NOTE]
 > ### Backend rework in progress
