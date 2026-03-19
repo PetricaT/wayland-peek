@@ -28,7 +28,7 @@ pip install -r requirements.txt
 and run the main script file
 
 ```
-python main.py<
+python main.py
 ```
 
 > [!NOTE]
