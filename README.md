@@ -8,6 +8,36 @@
 
 ---
 
+# Requirements
+
+This is just a front-end for the tool [kdotool](https://github.com/jinliu/kdotool) **(KDE only btw)**, you need to have it installed for this to work as I do not bundle it with my project. In my opinion the main tool is stable enough that it does not require me to bundle it separately.
+
+### ⭐️ Rust crate (Distro agnostic)
+```
+cargo install kdotool
+```
+
+### Arch AUR
+Yay
+```
+yay kdotool 
+```
+or if you use Paru
+```
+paru -S kdotool
+```
+
+### Fedora
+```
+sudo dnf install kdotool
+```
+
+### Debain, Ubuntu, Mint, Etc...
+
+Sadly Kdotool is not packaged for other repositories, so please use the rust crate if you find yourself in this scenario.
+
+---
+
 If you've used automation scripts on windows with [AutoHotKey](https://www.autohotkey.com/) you might be aware of the tool they bundle called "Window Spy", which is very handy in getting information about the window below the cursor + coordiantes on your screen. Problem is, there isn't any good alternative for Linux. There is [kdotool](https://github.com/jinliu/kdotool) but it's a CLI tool, so as a wise person once said *"If you don't like it, do it yourself"*, and that's how we got here.
 
 Also I higly reccomend [ydotool](https://github.com/ReimuNotMoe/ydotool) for any input automation. 
