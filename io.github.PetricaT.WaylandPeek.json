@@ -1,0 +1,88 @@
+{
+  "app-id": "io.github.PetricaT.WaylandPeek",
+  "runtime": "org.kde.Platform",
+  "runtime-version": "6.9",
+  "sdk": "org.kde.Sdk",
+  "command": "wayland-peek",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--talk-name=org.freedesktop.portal.Desktop",
+    "--talk-name=org.freedesktop.portal.GlobalShortcuts"
+  ],
+  "modules": [
+    {
+      "name": "python3-colorama",
+      "buildsystem": "simple",
+      "build-commands": [
+        "pip3 install --no-index --find-links=. --prefix=${FLATPAK_DEST} colorama"
+      ],
+      "sources": [
+        {
+          "type": "file",
+          "url": "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl",
+          "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"
+        }
+      ]
+    },
+    {
+      "name": "python3-dbus",
+      "buildsystem": "autotools",
+      "config-opts": [
+        "--with-python=python3"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://dbus.freedesktop.org/releases/dbus-python/dbus-python-1.3.2.tar.gz",
+          "sha256": "ad67819308618b5069537be237f8e68ca1c7fcc95ee4a121fe6845b1418248f8"
+        }
+      ]
+    },
+    {
+      "name": "wayland-peek",
+      "buildsystem": "simple",
+      "build-commands": [
+        "install -Dm755 main_portal.py ${FLATPAK_DEST}/bin/wayland-peek",
+        "install -Dm644 app.ui       ${FLATPAK_DEST}/share/wayland-peek/app.ui",
+        "install -Dm644 io.github.PetricaT.WaylandPeek.desktop ${FLATPAK_DEST}/share/applications/io.github.PetricaT.WaylandPeek.desktop",
+        "install -Dm644 io.github.PetricaT.WaylandPeek.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.PetricaT.WaylandPeek.metainfo.xml"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/PetricaT/wayland-peek.git",
+          "branch": "main"
+        }
+      ]
+    },
+    {
+      "name": "kdotool",
+      "buildsystem": "simple",
+      "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin",
+        "env": {
+          "CARGO_HOME": "/run/build/kdotool/cargo"
+        }
+      },
+      "build-commands": [
+        "cargo build --release",
+        "install -Dm755 target/release/kdotool ${FLATPAK_DEST}/bin/kdotool"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/jinliu/kdotool.git",
+          "tag": "v0.1.4"
+        },
+        {
+          "type": "file",
+          "path": "cargo-sources.json",
+          "dest": "cargo/",
+          "dest-filename": "config.toml"
+        }
+      ]
+    }
+  ]
+}

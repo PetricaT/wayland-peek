@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.PetricaT.WaylandPeek</id>
+  <name>WayPeek</name>
+  <summary>Window spy for Wayland - a kdotool GUI</summary>
+  <description>
+    <p>
+      WayPeek shows real-time information about the window under the cursor
+      and the current mouse position, inspired by the Window Spy tool from
+      AutoHotKey on Windows.
+    </p>
+    <p>
+      Hold the assigned "freeze" shortcut to pause updates, or use the toggle
+      shortcut to lock the display in place while you inspect values.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.PetricaT.WayPeek.desktop</launchable>
+  <url type="homepage">https://github.com/PetricaT/wayland-peek</url>
+  <url type="bugtracker">https://github.com/PetricaT/wayland-peek/issues</url>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.PetricaT">
+    <name>PetricaT</name>
+  </developer>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <recommends>
+    <control>keyboard</control>
+  </recommends>
+  <content_rating type="oars-1.1"/>
+</component>
