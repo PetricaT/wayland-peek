@@ -40,6 +40,7 @@ class keyboardManager:
 def _find_keyboards() -> list[InputDevice]:
     """
     Return all /dev/input devices that look like real keyboards.
+
     Requires a broad spread of letter, number, and modifier keys so that
     tablets, gamepads, and other HID devices that only expose a few KEY_*
     codes are excluded.
@@ -50,29 +51,35 @@ def _find_keyboards() -> list[InputDevice]:
         ecodes.KEY_LEFTCTRL,
         ecodes.KEY_LEFTSHIFT,
         ecodes.KEY_A,
-        ecodes.KEY_Z,  # letters
+        ecodes.KEY_Z,      # letters
         ecodes.KEY_ENTER,
         ecodes.KEY_SPACE,  # basics
     }
+
     keyboards = []
+
     for path in evdev.list_devices():
         try:
-            dev = InputDevice(path)
-            caps = dev.capabilities(verbose=True)
-            if ecodes.EV_KEY in caps:
-                key_codes = set(caps[ecodes.EV_KEY])
-                if REQUIRED_KEYS.issubset(key_codes):
-                    print(f"[keyboard] Found device: {dev.name!r} ({dev.path})")
-                    print(caps)
-                    keyboards.append(dev)
-                else:
-                    # missing = REQUIRED_KEYS - key_codes
-                    missing = REQUIRED_KEYS
-                    print(
-                        f"[keyboard] Skipping {dev.name!r} ({dev.path}) — not a keyboard, missing: {[ecodes.KEY[k] for k in missing]}"
-                    )
+            caps = dev.capabilities(verbose=False)
+
+            if ecodes.EV_KEY not in caps:
+                continue
+
+            key_codes = set(caps[ecodes.EV_KEY])
+            missing = REQUIRED_KEYS - key_codes
+
+            if not missing:
+                print(f"[keyboard] Found device: {dev.name!r} ({dev.path})")
+                keyboards.append(dev)
+            else:
+                print(
+                    f"[keyboard] Skipping {dev.name!r} ({dev.path}) — "
+                    f"not a keyboard, missing: {[ecodes.KEY[k] for k in missing]}"
+                )
+
         except (PermissionError, OSError) as e:
             print(f"[keyboard] Skipping {path}: {e}")
+
     return keyboards
 
 
@@ -85,8 +92,21 @@ def _listen_keyboard(dev: InputDevice, handler: keyboardManager):
         0 = key up
         1 = key down
         2 = key hold (auto-repeat)
+
+    The device is grabbed exclusively so Wayland compositors cannot suppress
+    our events.  The grab is released automatically when the fd is closed.
     """
     print(f"[keyboard] Listening on {dev.name!r} ({dev.path})")
+
+    try:
+        # Grab the device so we reliably receive all key events even under
+        # a Wayland compositor that would otherwise swallow them.
+        dev.grab()
+        print(f"[keyboard] Grabbed {dev.name!r} ({dev.path})")
+    except OSError as e:
+        # Non-fatal: we can still read events, just without exclusivity.
+        print(f"[keyboard] Could not grab {dev.path}: {e} (continuing without grab)")
+
     try:
         for event in dev.read_loop():
             if event.type != ecodes.EV_KEY:
@@ -98,6 +118,10 @@ def _listen_keyboard(dev: InputDevice, handler: keyboardManager):
             # ESC hard exit
             if code == ecodes.KEY_ESC and value == 1:
                 print("[keyboard] ESC pressed → exiting")
+                try:
+                    dev.ungrab()
+                except OSError:
+                    pass
                 os._exit(0)
 
             # CTRL hold-to-freeze
@@ -106,7 +130,7 @@ def _listen_keyboard(dev: InputDevice, handler: keyboardManager):
                     print(f"[keyboard] CTRL down (code={code}, device={dev.path})")
                     handler.handle_ctrl_switch(True)
                 elif value == 0:
-                    print(f"[keyboard] CTRL up   (code={code}, device={dev.path})")
+                    print(f"[keyboard] CTRL up (code={code}, device={dev.path})")
                     handler.handle_ctrl_switch(False)
 
             # Left Shift toggle freeze
@@ -116,7 +140,11 @@ def _listen_keyboard(dev: InputDevice, handler: keyboardManager):
 
     except (OSError, IOError) as e:
         print(f"[keyboard] Device {dev.path} lost: {e}")
-        pass
+    finally:
+        try:
+            dev.ungrab()
+        except OSError:
+            pass
 
 
 def start_keyboard_listeners(handler: keyboardManager):
@@ -163,7 +191,6 @@ class MainApp:
     def __init__(self):
         self.app = QtWidgets.QApplication(sys.argv)
         self.window = QUiLoader().load("app.ui")
-
         self.polling_interval = 0.1
 
         self.cursor_label = self.window.findChild(
@@ -171,14 +198,16 @@ class MainApp:
         )
         if self.cursor_label is not None:
             self.cursor_label.setText(self._query_info("cursor_info"))
-            self._updater = LabelUpdater()
-            self._updater.position_changed.connect(self.cursor_label.setText)
+
+        self._updater = LabelUpdater()
+        self._updater.position_changed.connect(self.cursor_label.setText)
 
         self.window_label = self.window.findChild(QtWidgets.QLabel, "WindowInfoLabel")
         if self.window_label is not None:
             self.window_label.setText(self._query_info("window_info"))
-            self._window_updater = LabelUpdater()
-            self._window_updater.position_changed.connect(self.window_label.setText)
+
+        self._window_updater = LabelUpdater()
+        self._window_updater.position_changed.connect(self.window_label.setText)
 
         self._poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._poll_thread.start()
@@ -211,6 +240,7 @@ class MainApp:
             .stdout.strip()
             .decode("utf-8")
         )
+
         try:
             if type == "cursor_info":
                 result = result.split("\n")
@@ -239,6 +269,7 @@ class MainApp:
                 )
                 self._window_pid = result[6]
                 return f"Title: {self._window_title}\nExe name: {self._executable_name}\nWindow position: {self._window_position}\nWindow geometry: {self._window_geometry}\nWindow PID: {self._window_pid}"
+
         except IndexError as e:
             return f"Index error| {e}"
         except ValueError as e:
@@ -267,6 +298,7 @@ if __name__ == "__main__":
             + ", sorry...."
         )
         sys.exit(0)
+
     try:
         subprocess.run(["kdotool", "--version"], stdout=subprocess.PIPE)
     except FileNotFoundError:
